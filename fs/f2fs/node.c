@@ -2006,8 +2006,10 @@ bool alloc_nid(struct f2fs_sb_info *sbi, nid_t *nid)
 	struct free_nid *i = NULL;
 retry:
 #ifdef CONFIG_F2FS_FAULT_INJECTION
-	if (time_to_inject(sbi, FAULT_ALLOC_NID))
+	if (time_to_inject(sbi, FAULT_ALLOC_NID)) {
+		f2fs_show_injection_info(FAULT_ALLOC_NID);
 		return false;
+	}
 #endif
 	spin_lock(&nm_i->nid_list_lock);
 
@@ -2479,9 +2481,6 @@ static int __get_nat_bitmaps(struct f2fs_sb_info *sbi)
 	unsigned int nat_bits_bytes = nm_i->nat_blocks / BITS_PER_BYTE;
 	unsigned int i;
 	__u64 cp_ver = cur_cp_version(ckpt);
-	size_t crc_offset = le32_to_cpu(ckpt->checksum_offset);
-	__u64 crc = le32_to_cpu(*((__le32 *)
-				((unsigned char *)ckpt + crc_offset)));
 	block_t nat_bits_addr;
 
 	if (!enabled_nat_bits(sbi, NULL))
@@ -2504,7 +2503,7 @@ static int __get_nat_bitmaps(struct f2fs_sb_info *sbi)
 		f2fs_put_page(page, 1);
 	}
 
-	cp_ver |= (crc << 32);
+	cp_ver |= (cur_cp_crc(ckpt) << 32);
 	if (cpu_to_le64(cp_ver) != *(__le64 *)nm_i->nat_bits) {
 		disable_nat_bits(sbi, true);
 		return 0;
