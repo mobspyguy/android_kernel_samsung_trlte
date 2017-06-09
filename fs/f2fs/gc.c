@@ -48,10 +48,8 @@ static int gc_thread_func(void *data)
 		}
 
 #ifdef CONFIG_F2FS_FAULT_INJECTION
-		if (time_to_inject(sbi, FAULT_CHECKPOINT)) {
-			f2fs_show_injection_info(FAULT_CHECKPOINT);
+		if (time_to_inject(sbi, FAULT_CHECKPOINT))
 			f2fs_stop_checkpoint(sbi, false);
-		}
 #endif
 
 		/*
@@ -952,22 +950,21 @@ gc_more:
 		goto stop;
 	}
 
-	if (gc_type == BG_GC && has_not_enough_free_secs(sbi, 0, 0)) {
+	if (gc_type == BG_GC && has_not_enough_free_secs(sbi, sec_freed, 0)) {
+		gc_type = FG_GC;
 		/*
-		 * For example, if there are many prefree_segments below given
-		 * threshold, we can make them free by checkpoint. Then, we
-		 * secure free segments which doesn't need fggc any more.
+		 * If there is no victim and no prefree segment but still not
+		 * enough free sections, we should flush dent/node blocks and do
+		 * garbage collections.
 		 */
 		ret = write_checkpoint(sbi, &cpc);
 		if (ret)
 			goto stop;
-		if (has_not_enough_free_secs(sbi, 0, 0))
-			gc_type = FG_GC;
+	} else if (gc_type == BG_GC && !background) {
+		/* f2fs_balance_fs doesn't need to do BG_GC in critical path. */
+		goto stop;
 	}
 
-	/* f2fs_balance_fs doesn't need to do BG_GC in critical path. */
-	if (gc_type == BG_GC && !background)
-		goto stop;
 	if (!__get_victim(sbi, &segno, gc_type))
 		goto stop;
 	ret = 0;
@@ -1008,6 +1005,6 @@ void build_gc_manager(struct f2fs_sb_info *sbi)
 	ovp_count = SM_I(sbi)->ovp_segments << sbi->log_blocks_per_seg;
 	blocks_per_sec = sbi->blocks_per_seg * sbi->segs_per_sec;
 
-	sbi->fggc_threshold = div64_u64((main_count - ovp_count) * blocks_per_sec,
+	sbi->fggc_threshold = div_u64((main_count - ovp_count) * blocks_per_sec,
 					(main_count - resv_count));
 }

@@ -413,7 +413,7 @@ do_insert:
 	return en;
 }
 
-static void f2fs_update_extent_tree_range(struct inode *inode,
+static unsigned int f2fs_update_extent_tree_range(struct inode *inode,
 				pgoff_t fofs, block_t blkaddr, unsigned int len)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
@@ -426,7 +426,7 @@ static void f2fs_update_extent_tree_range(struct inode *inode,
 	unsigned int pos = (unsigned int)fofs;
 
 	if (!et)
-		return;
+		return false;
 
 	trace_f2fs_update_extent_tree_range(inode, fofs, blkaddr, len);
 
@@ -434,7 +434,7 @@ static void f2fs_update_extent_tree_range(struct inode *inode,
 
 	if (is_inode_flag_set(inode, FI_NO_EXTENT)) {
 		write_unlock(&et->lock);
-		return;
+		return false;
 	}
 
 	prev = et->largest;
@@ -531,6 +531,8 @@ static void f2fs_update_extent_tree_range(struct inode *inode,
 		__free_extent_tree(sbi, et);
 
 	write_unlock(&et->lock);
+
+	return !__is_extent_same(&prev, &et->largest);
 }
 
 unsigned int f2fs_shrink_extent_tree(struct f2fs_sb_info *sbi, int nr_shrink)
