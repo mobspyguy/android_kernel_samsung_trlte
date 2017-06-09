@@ -485,11 +485,11 @@ static int submit_flush_wait(struct f2fs_sb_info *sbi)
 	int ret = __submit_flush_wait(sbi->sb->s_bdev);
 	int i;
 
-	trace_f2fs_issue_flush(sbi->sb, test_opt(sbi, NOBARRIER),
-					test_opt(sbi, FLUSH_MERGE));
-
 	if (sbi->s_ndevs && !ret) {
 		for (i = 1; i < sbi->s_ndevs; i++) {
+			trace_f2fs_issue_flush(FDEV(i).bdev,
+					test_opt(sbi, NOBARRIER),
+					test_opt(sbi, FLUSH_MERGE));
 			ret = __submit_flush_wait(FDEV(i).bdev);
 			if (ret)
 				break;
@@ -899,7 +899,7 @@ static int __f2fs_issue_discard_async(struct f2fs_sb_info *sbi,
 	block_t lblkstart = blkstart;
 	int err;
 
-	trace_f2fs_issue_discard(sbi->sb, blkstart, blklen);
+	trace_f2fs_issue_discard(bdev, blkstart, blklen);
 
 	if (sbi->s_ndevs) {
 		int devi = f2fs_target_device_index(sbi, blkstart);
@@ -954,7 +954,7 @@ static int __f2fs_issue_discard_zone(struct f2fs_sb_info *sbi,
 		return __f2fs_issue_discard_async(sbi, bdev, blkstart, blklen);
 	case BLK_ZONE_TYPE_SEQWRITE_REQ:
 	case BLK_ZONE_TYPE_SEQWRITE_PREF:
-		trace_f2fs_issue_reset_zone(sbi->sb, blkstart);
+		trace_f2fs_issue_reset_zone(bdev, blkstart);
 		return blkdev_reset_zones(bdev, sector,
 					  nr_sects, GFP_NOFS);
 	default:
@@ -1703,7 +1703,8 @@ static void allocate_segment_by_default(struct f2fs_sb_info *sbi,
 
 	if (force)
 		new_curseg(sbi, type, true);
-	else if (type == CURSEG_WARM_NODE)
+	else if (!is_set_ckpt_flags(sbi, CP_CRC_RECOVERY_FLAG) &&
+					type == CURSEG_WARM_NODE)
 		new_curseg(sbi, type, false);
 	else if (curseg->alloc_type == LFS && is_next_segment_free(sbi, type))
 		new_curseg(sbi, type, false);
