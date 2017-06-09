@@ -56,8 +56,10 @@ static void f2fs_read_end_io(struct bio *bio, int err)
 	int i;
 
 #ifdef CONFIG_F2FS_FAULT_INJECTION
-	if (time_to_inject(F2FS_P_SB(bio->bi_io_vec->bv_page), FAULT_IO))
+	if (time_to_inject(F2FS_P_SB(bio->bi_io_vec->bv_page), FAULT_IO)) {
+		f2fs_show_injection_info(FAULT_IO);
 		err = -EIO;
+	}
 #endif
 
 	if (f2fs_bio_encrypted(bio)) {
@@ -396,7 +398,8 @@ alloc_new:
 		if ((fio->type == DATA || fio->type == NODE) &&
 				fio->new_blkaddr & F2FS_IO_SIZE_MASK(sbi)) {
 			err = -EAGAIN;
-			dec_page_count(sbi, WB_DATA_TYPE(bio_page));
+			if (!is_read)
+				dec_page_count(sbi, WB_DATA_TYPE(bio_page));
 			goto out_fail;
 		}
 		io->bio = __bio_alloc(sbi, fio->new_blkaddr,
